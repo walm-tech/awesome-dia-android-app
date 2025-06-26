@@ -1,11 +1,14 @@
 package com.example.webview;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -20,6 +23,10 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
 
     private WebView mywebView;
@@ -33,6 +40,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize file chooser launcher
         initializeFileChooser();
+
+        requestPermissions();
 
         mywebView = findViewById(R.id.webview);
         setupWebView();
@@ -96,14 +105,14 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
 
+
         // Support multiple windows
         webSettings.setSupportMultipleWindows(true);
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // Enable mixed content (if your site uses both HTTP and HTTPS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        }
+        //minimum sdk is 24 so no need for additional check here
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+
 
         // Set WebViewClient to handle page navigation
         mywebView.setWebViewClient(new MyWebViewClient());
@@ -154,6 +163,13 @@ public class MainActivity extends AppCompatActivity {
         public void onProgressChanged(WebView view, int newProgress) {
             super.onProgressChanged(view, newProgress);
             // Update progress bar if you have one
+        }
+
+        @Override
+        public void onPermissionRequest(PermissionRequest request) {
+            runOnUiThread(() -> {
+                request.grant(request.getResources());
+            });
         }
 
         @Override
@@ -223,4 +239,26 @@ public class MainActivity extends AppCompatActivity {
         }
         super.onDestroy();
     }
+
+    ActivityResultLauncher<String[]> multiplePermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(), result->{
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+                    Boolean notif_granted = result.getOrDefault(Manifest.permission.POST_NOTIFICATIONS, false);
+                }
+                Boolean audio_granted = result.getOrDefault(Manifest.permission.RECORD_AUDIO, false);
+
+            });
+
+    void requestPermissions(){
+        //put any other permission requests inside this function
+        List<String> permissions = new ArrayList<String>();
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        permissions.add(Manifest.permission.RECORD_AUDIO);
+
+        multiplePermissionLauncher.launch(permissions.toArray(new String[0]));
+    }
 }
+
