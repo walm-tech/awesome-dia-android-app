@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.webview"
+    namespace = "com.chaimate.dia"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.webview"
+        applicationId = "com.chaimate.dia"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

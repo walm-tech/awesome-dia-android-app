@@ -19,5 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "WebView"
+rootProject.name = "Dia"
 include(":app")
+ 
