@@ -11,20 +11,31 @@ android {
         minSdk = 24
         targetSdk = 35
         versionCode = 2
-        versionName = "2.0"
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore/my-release-key.jks")
+            storePassword = project.property("KEYSTORE_PASSWORD") as String
+            keyAlias = "my-key-alias"
+            keyPassword = project.property("KEY_PASSWORD") as String
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -32,7 +43,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
