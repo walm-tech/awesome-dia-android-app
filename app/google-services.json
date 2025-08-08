@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1089753222456",
+    "project_id": "awesome-dia-android",
+    "storage_bucket": "awesome-dia-android.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089753222456:android:714b48d7044757516fc5cd",
+        "android_client_info": {
+          "package_name": "com.chaimate.dia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5r5ddq_EQk5XTmogOgCs2wtJx40fRt9w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
