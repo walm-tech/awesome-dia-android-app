@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "1089753222456",
-    "project_id": "awesome-dia-android",
-    "storage_bucket": "awesome-dia-android.firebasestorage.app"
+    "project_number": "659768616087",
+    "project_id": "awesome-dia-android-799f9",
+    "storage_bucket": "awesome-dia-android-799f9.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1089753222456:android:714b48d7044757516fc5cd",
+        "mobilesdk_app_id": "1:659768616087:android:7d807111c8cbced32bb5d2",
         "android_client_info": {
           "package_name": "com.chaimate.dia"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "659768616087-0v4bmu6geap06243123c3958mqisbr4c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chaimate.dia",
+            "certificate_hash": "8dc64823f236ac4645b52d39bdf88980c268098b"
+          }
+        },
+        {
+          "client_id": "659768616087-dqatfva8gcjbj88091smabpka9m02qhp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyC5r5ddq_EQk5XTmogOgCs2wtJx40fRt9w"
+          "current_key": "AIzaSyB8YIdvdT1Tl7fxwtMu0tAQaTapZyaKQIU"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "659768616087-dqatfva8gcjbj88091smabpka9m02qhp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
