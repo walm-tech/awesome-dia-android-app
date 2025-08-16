@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
@@ -18,6 +19,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.util.Log;
 import android.widget.Toast;
+import android.view.View;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import androidx.core.app.NotificationCompat;
@@ -59,7 +61,7 @@ import java.io.IOException;
 public class MainActivity extends AppCompatActivity {
     private NotificationHelper notificationHelper;
     private static final String TAG = "MainActivity";
-    private static final String BASE_URL = "https://dia.chaimate.ai?source=android";
+    private static final String BASE_URL = "https://dia.chaimate.ai";
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
@@ -75,7 +77,43 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREF_LAST_URL = "last_url";
     private static final String PREF_LAST_SCROLL_Y = "last_scroll_y";
     private boolean isWebViewStateRestored = false;
+    private static final int REQUEST_PERMISSIONS = 1;
+    private PermissionRequest currentPermissionRequest;
 
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_PERMISSIONS) {
+            boolean allPermissionsGranted = true;
+
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allPermissionsGranted = false;
+                    break;
+                }
+            }
+
+            if (allPermissionsGranted) {
+                Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show();
+
+                // If there's a pending permission request, grant it
+                if (currentPermissionRequest != null) {
+                    currentPermissionRequest.grant(currentPermissionRequest.getResources());
+                    currentPermissionRequest = null;
+                }
+            } else {
+                Toast.makeText(this, "Microphone permission is required for audio features", Toast.LENGTH_LONG).show();
+
+                // Deny the web permission request
+                if (currentPermissionRequest != null) {
+                    currentPermissionRequest.deny();
+                    currentPermissionRequest = null;
+                }
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +124,28 @@ public class MainActivity extends AppCompatActivity {
 
         // Request notification permission for Android 13+ (only if needed)
         requestNotificationPermission();
+        requestPermissions();
+
+        // Initialize file chooser launcher
+        fileChooserLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && filePathCallback != null) {
+                    Uri[] results = null;
+                    if (result.getData() != null) {
+                        String dataString = result.getData().getDataString();
+                        if (dataString != null) {
+                            results = new Uri[]{Uri.parse(dataString)};
+                        }
+                    }
+                    filePathCallback.onReceiveValue(results);
+                    filePathCallback = null;
+                } else if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                    filePathCallback = null;
+                }
+            }
+        );
 
         // Initialize Google Sign-In launcher for Firebase
         googleSignInLauncher = registerForActivityResult(
@@ -118,27 +178,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-        // Initialize file chooser launcher
-        fileChooserLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == RESULT_OK && filePathCallback != null) {
-                    Uri[] results = null;
-                    if (result.getData() != null) {
-                        String dataString = result.getData().getDataString();
-                        if (dataString != null) {
-                            results = new Uri[]{Uri.parse(dataString)};
-                        }
-                    }
-                    filePathCallback.onReceiveValue(results);
-                    filePathCallback = null;
-                } else if (filePathCallback != null) {
-                    filePathCallback.onReceiveValue(null);
-                    filePathCallback = null;
-                }
-            }
-        );
-
+        
         try {
             // Initialize Firebase Auth
             mAuth = FirebaseAuth.getInstance();
@@ -386,20 +426,6 @@ public class MainActivity extends AppCompatActivity {
         saveWebViewStateToPreferences();
     }
 
-//    @Override
-//    protected void onResume() {
-//        super.onResume();
-//
-//        Log.d(TAG, "App resumed - checking if FCM token update is needed");
-//
-//        // Only check FCM token if activity is not finishing
-//        if (!isFinishing() && !isDestroyed()) {
-//            Log.d(TAG, "Activity is active, proceeding with FCM token check");
-//            checkAndUpdateFcmToken();
-//        } else {
-//            Log.d(TAG, "Activity is finishing or destroyed, skipping FCM token check");
-//        }
-//    }
 
     @Override
     public void onBackPressed() {
@@ -437,6 +463,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+
+    private void requestPermissions() {
+        String[] permissions = {
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.MODIFY_AUDIO_SETTINGS,
+        };
+
+        // Check if permissions are already granted
+        boolean allPermissionsGranted = true;
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                allPermissionsGranted = false;
+                break;
+            }
+        }
+
+        if (!allPermissionsGranted) {
+            ActivityCompat.requestPermissions(this, permissions, REQUEST_PERMISSIONS);
+        }
+    }
 
     private void requestNotificationPermission() {
         // Only request notification permission on Android 13+ (API 33+)
@@ -507,12 +553,25 @@ public class MainActivity extends AppCompatActivity {
             WebSettings webSettings = webView.getSettings();
             
             // Basic WebView settings
-            webSettings.setJavaScriptEnabled(true);
-            webSettings.setDomStorageEnabled(true);
-            webSettings.setAllowFileAccess(true);
-            webSettings.setAllowContentAccess(true);
-            webSettings.setMediaPlaybackRequiresUserGesture(false);
-            webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+          WebSettings settings = webView.getSettings();
+            settings.setJavaScriptEnabled(true);
+            settings.setDomStorageEnabled(true);
+            settings.setDatabaseEnabled(true);
+            settings.setMediaPlaybackRequiresUserGesture(false);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        // Enable mixed content (if needed)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+
+        // Set user agent (some sites require this for media access)
+        settings.setUserAgentString("Mozilla/5.0 (Linux; Android " + Build.VERSION.RELEASE + ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36");
+
+        // Enable hardware acceleration
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             
             // Enable caching and state retention
             webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -528,13 +587,6 @@ public class MainActivity extends AppCompatActivity {
                 cookieManager.setAcceptThirdPartyCookies(webView, true);
             }
             
-            // Enable microphone and camera access
-            webSettings.setAllowFileAccessFromFileURLs(true);
-            webSettings.setAllowUniversalAccessFromFileURLs(true);
-            
-            // Enable hardware acceleration
-            webView.setLayerType(WebView.LAYER_TYPE_HARDWARE, null);
-            
             // Add JavaScript interface
             webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
             
@@ -543,9 +595,6 @@ public class MainActivity extends AppCompatActivity {
                 public void onPageFinished(WebView view, String url) {
                     super.onPageFinished(view, url);
                     Log.d(TAG, "WebView page loaded: " + url);
-                    
-                    // Log cookies for debugging
-                    logCookies(url);
                     
                     // Sync cookies to ensure they are persisted
                     syncCookies();
@@ -561,26 +610,86 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             
-            webView.setWebChromeClient(new WebChromeClient() {
-                @Override
-                public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
-                                               FileChooserParams fileChooserParams) {
-                    MainActivity.this.filePathCallback = filePathCallback;
-                    
-                    // Only allow gallery access - no camera
-                    Intent chooserIntent = new Intent(Intent.ACTION_GET_CONTENT);
-                    chooserIntent.addCategory(Intent.CATEGORY_OPENABLE);
-                    chooserIntent.setType("image/*"); // Only images from gallery
-                    
-                    Intent chooser = new Intent(Intent.ACTION_CHOOSER);
-                    chooser.putExtra(Intent.EXTRA_INTENT, chooserIntent);
-                    chooser.putExtra(Intent.EXTRA_TITLE, "Select Image from Gallery");
-                    
-                    fileChooserLauncher.launch(chooser);
-                    return true;
-                }
+                          // WebChromeClient to handle permissions and media
+             webView.setWebChromeClient(new WebChromeClient() {
+                 @Override
+                 public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
+                                                FileChooserParams fileChooserParams) {
+                     MainActivity.this.filePathCallback = filePathCallback;
+                     
+                     // Only allow gallery access - no camera
+                     Intent chooserIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                     chooserIntent.addCategory(Intent.CATEGORY_OPENABLE);
+                     chooserIntent.setType("image/*"); // Only images from gallery
+                     
+                     Intent chooser = new Intent(Intent.ACTION_CHOOSER);
+                     chooser.putExtra(Intent.EXTRA_INTENT, chooserIntent);
+                     chooser.putExtra(Intent.EXTRA_TITLE, "Select Image from Gallery");
+                     
+                     fileChooserLauncher.launch(chooser);
+                     return true;
+                 }
 
-            });
+                 @Override
+                 public void onPermissionRequest(PermissionRequest request) {
+                     // Store the permission request
+                     currentPermissionRequest = request;
+
+                     // Check what permissions are being requested
+                     String[] requestedResources = request.getResources();
+                     boolean audioRequested = false;
+                     boolean videoRequested = false;
+
+                     for (String resource : requestedResources) {
+                         if (resource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                             audioRequested = true;
+                         } else if (resource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                             videoRequested = true;
+                         }
+                     }
+
+                     // Check if we have the necessary Android permissions
+                     boolean hasAudioPermission = ContextCompat.checkSelfPermission(MainActivity.this,
+                             Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+                     boolean hasCameraPermission = ContextCompat.checkSelfPermission(MainActivity.this,
+                             Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+
+                     if (audioRequested && !hasAudioPermission) {
+                         // Request audio permission if not granted
+                         ActivityCompat.requestPermissions(MainActivity.this,
+                                 new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSIONS);
+                         return;
+                     }
+
+                     if (videoRequested && !hasCameraPermission) {
+                         // Request camera permission if not granted
+                         ActivityCompat.requestPermissions(MainActivity.this,
+                                 new String[]{Manifest.permission.CAMERA}, REQUEST_PERMISSIONS);
+                         return;
+                     }
+
+                     // Grant the requested permissions
+                     runOnUiThread(() -> {
+                         if (request != null) {
+                             request.grant(requestedResources);
+                         }
+                     });
+                 }
+
+                 @Override
+                 public void onPermissionRequestCanceled(PermissionRequest request) {
+                     super.onPermissionRequestCanceled(request);
+                     currentPermissionRequest = null;
+                 }
+
+                 @Override
+                 public void onProgressChanged(WebView view, int newProgress) {
+                     super.onProgressChanged(view, newProgress);
+                     // You can show a progress bar here if needed
+                 }
+             });
+
+
             
             // Load your URL only if WebView state is not being restored
             if (!isWebViewStateRestored) {
@@ -698,6 +807,7 @@ public class MainActivity extends AppCompatActivity {
             }, 500); // Just 500ms delay to show success message
         });
     }
+    
 
     private void checkAndUpdateFcmToken() {
         try {
@@ -945,62 +1055,13 @@ public class MainActivity extends AppCompatActivity {
         
 
 
-        @JavascriptInterface
-        public void testMicrophoneAccess() {
-            Log.d(TAG, "testMicrophoneAccess called from JavaScript");
-            runOnUiThread(() -> {
-                // Inject JavaScript to test microphone access with detailed error reporting
-                String js = "console.log('Testing microphone access...'); " +
-                           "console.log('navigator.mediaDevices:', navigator.mediaDevices); " +
-                           "console.log('getUserMedia available:', !!navigator.mediaDevices.getUserMedia); " +
-                           "navigator.mediaDevices.getUserMedia({ audio: true })" +
-                           ".then(stream => { " +
-                           "  console.log('Microphone access successful!'); " +
-                           "  console.log('Stream tracks:', stream.getTracks().length); " +
-                           "  if (window.AndroidBridge) { window.AndroidBridge.logMessage('Microphone access successful!'); }" +
-                           "  stream.getTracks().forEach(track => track.stop()); " +
-                           "})" +
-                           ".catch(error => { " +
-                           "  console.error('Microphone access failed:', error); " +
-                           "  console.error('Error name:', error.name); " +
-                           "  console.error('Error message:', error.message); " +
-                           "  console.error('Error code:', error.code); " +
-                           "  if (window.AndroidBridge) { window.AndroidBridge.logMessage('Microphone access failed: ' + error.name + ' - ' + error.message); } " +
-                           "});";
-                
-                if (webView != null) {
-                    webView.evaluateJavascript(js, null);
-                }
-            });
-        }
 
-        @JavascriptInterface
-        public void debugMicrophonePermissions() {
-            Log.d(TAG, "debugMicrophonePermissions called from JavaScript");
-            runOnUiThread(() -> {
-                // Inject JavaScript to debug microphone permissions
-                String js = "console.log('=== Microphone Permission Debug ==='); " +
-                           "console.log('navigator.mediaDevices:', navigator.mediaDevices); " +
-                           "console.log('getUserMedia available:', !!navigator.mediaDevices.getUserMedia); " +
-                           "console.log('Permissions API available:', !!navigator.permissions); " +
-                           "if (navigator.permissions) { " +
-                           "  navigator.permissions.query({name: 'microphone'}).then(result => { " +
-                           "    console.log('Microphone permission state:', result.state); " +
-                           "    console.log('Permission result:', result); " +
-                           "  }).catch(err => { " +
-                           "    console.error('Permission query failed:', err); " +
-                           "    console.error('Permission error name:', err.name); " +
-                           "    console.error('Permission error message:', err.message); " +
-                           "  }); " +
-                           "} else { " +
-                           "  console.log('Permissions API not available'); " +
-                           "}";
+
+
+
+
                 
-                if (webView != null) {
-                    webView.evaluateJavascript(js, null);
-                }
-            });
-        }
+
 
         @JavascriptInterface
         public void logMessage(String message) {
@@ -1012,19 +1073,19 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Clearing saved WebView state from JavaScript");
             runOnUiThread(() -> {
                 clearSavedWebViewState();
-                            Log.d(TAG, "Saved state cleared");
-        });
+                Log.d(TAG, "Saved state cleared");
+            });
+        }
     }
-    
-    @JavascriptInterface
-    public void testNotification() {
-        Log.d(TAG, "testNotification called from JavaScript");
-        runOnUiThread(() -> {
-            
-            // Create a simple test notification using the direct approach
-            showSimpleTestNotification();
-        });
-    }
+
+    private void logCookies(String url) {
+        Log.d(TAG, "Cookies for URL: " + url);
+        String cookies = CookieManager.getInstance().getCookie(url);
+        if (cookies != null) {
+            Log.d(TAG, "Cookies: " + cookies);
+        } else {
+            Log.d(TAG, "No cookies found for URL: " + url);
+        }
     }
 
     private void sendFcmTokenToBackend(String fcmToken, String accessToken) {
@@ -1059,16 +1120,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void logCookies(String url) {
-        Log.d(TAG, "Cookies for URL: " + url);
-        String cookies = CookieManager.getInstance().getCookie(url);
-        if (cookies != null) {
-            Log.d(TAG, "Cookies: " + cookies);
-        } else {
-            Log.d(TAG, "No cookies found for URL: " + url);
-        }
-    }
-
     private void syncCookies() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -1083,95 +1134,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not sync cookies", e);
-        }
-    }
-    
-    // Test method to verify notifications work
-    private void showTestNotification() {
-        try {
-            Log.d(TAG, "=== SHOWING TEST NOTIFICATION ===");
-            
-            NotificationManager notificationManager = 
-                (NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
-
-            if (notificationManager == null) {
-                Log.e(TAG, "NotificationManager is null!");
-                return;
-            }
-
-            // Create intent for when notification is tapped
-            Intent intent = new Intent(this, MainActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_IMMUTABLE
-            );
-
-            // Build the notification with ALL possible heads-up settings
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "dia_notification_channel")
-                .setContentTitle("Test Heads-Up Notification")
-                .setContentText("This is a test notification to verify heads-up display and sound")
-                .setPriority(NotificationCompat.PRIORITY_MAX)  // MAX priority for heads-up
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)  // Sound, vibration, lights
-                .setVibrate(new long[]{0, 500, 200, 500})
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setFullScreenIntent(pendingIntent, true)  // CRITICAL: Force heads-up display
-                .setStyle(new androidx.core.app.NotificationCompat.BigTextStyle().bigText("This is a test notification to verify heads-up display and sound"));
-
-            // Add sound explicitly
-            builder.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI);
-
-            // Build the final notification
-            android.app.Notification notification = builder.build();
-            
-            // Add critical flags for heads-up display
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                notification.flags |= android.app.Notification.FLAG_INSISTENT;
-                notification.flags |= android.app.Notification.FLAG_HIGH_PRIORITY;
-            }
-
-            // Show the notification
-            notificationManager.notify(999, notification);
-            
-            Log.d(TAG, "=== TEST NOTIFICATION DISPLAYED ===");
-            Log.d(TAG, "Priority: MAX");
-            Log.d(TAG, "Full Screen Intent: true");
-            Log.d(TAG, "Flags: " + notification.flags);
-            Log.d(TAG, "Sound: " + (notification.sound != null ? "Enabled" : "Disabled"));
-            Log.d(TAG, "Vibration: " + (notification.vibrate != null ? "Enabled" : "Disabled"));
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing test notification", e);
-            e.printStackTrace();
-        }
-    }
-
-    // WhatsApp-style test notification
-    private void showSimpleTestNotification() {
-        try {
-            Log.d(TAG, "=== SHOWING WHATSAPP-STYLE TEST NOTIFICATION ===");
-            
-            // Use NotificationHelper for consistent behavior
-            if (notificationHelper != null) {
-                notificationHelper.showHeadsUpNotification(
-                    "Test Heads-Up Notification",
-                    "This should pop up as a banner, then become quiet in the shade!",
-                    MainActivity.class
-                );
-            } else {
-                Log.e(TAG, "NotificationHelper is null!");
-            }
-            
-            Log.d(TAG, "WhatsApp-style test notification sent");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing WhatsApp-style test notification", e);
-            e.printStackTrace();
         }
     }
 }

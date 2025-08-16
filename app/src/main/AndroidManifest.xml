@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet permission (required for app functionality) -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Microphone permission -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Android 13+ media permissions for gallery access -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <!-- Notification permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Microphone feature -->
-    <uses-feature android:name="android.hardware.microphone" />
 
     <application
         android:icon="@mipmap/ic_launcher"
