@@ -61,7 +61,7 @@ import java.io.IOException;
 public class MainActivity extends AppCompatActivity {
     private NotificationHelper notificationHelper;
     private static final String TAG = "MainActivity";
-    private static final String BASE_URL = "https://dia.chaimate.ai";
+    private static final String BASE_URL = "https://dia.chaimate.ai?source=android";
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
